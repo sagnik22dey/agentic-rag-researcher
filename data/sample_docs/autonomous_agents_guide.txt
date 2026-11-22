@@ -1,0 +1,25 @@
+# Autonomous AI Agents and Agentic Workflows: Complete Technical Architecture
+
+## 1. Overview of Agentic AI
+Autonomous AI agents represent an evolution beyond static, prompt-response Large Language Models (LLMs). While traditional LLMs are passive prediction engines, agentic systems possess autonomy, goal persistence, tool invocation capabilities, and iterative self-reflection loops.
+
+Key architectural characteristics include:
+- Planning: Decomposing complex goals into sequential sub-tasks using techniques such as ReAct (Reasoning and Acting) and Plan-and-Solve.
+- Memory: Distinguishing between short-term working memory (in-context conversation state) and long-term memory (persisted semantic vectors in databases such as ChromaDB, Pinecone, or Qdrant).
+- Tool Execution: Calling deterministic calculators, code execution sandboxes, REST APIs, and live web search engines.
+- Self-Reflection and Evaluation: Autonomous grading of intermediate outputs, detecting factual inconsistencies, and triggering corrective actions prior to delivering responses.
+
+## 2. Corrective RAG (CRAG) Mechanics
+Standard Retrieval-Augmented Generation (RAG) suffers from a significant failure mode: retrieving irrelevant, outdated, or hallucinated chunks and injecting them directly into the context window.
+
+Corrective RAG (CRAG) addresses this with four explicit stages:
+1. Retrieval: Querying dense and sparse indexes to surface candidate chunks.
+2. Retrieval Evaluation: A dedicated evaluator grades the relevance of each chunk against the user query.
+3. Knowledge Refinement: Decomposing relevant chunks to eliminate extraneous noise.
+4. Corrective Search: If the retrieved chunks fail the confidence threshold, the agent rewrites the query and executes an external web search fallback.
+
+## 3. Deployment and Scalability Considerations
+When deploying agentic systems in production:
+- Latency Management: Streaming node states progressively reduces perceived user latency.
+- Model Selection: Small language models (SLMs) such as Llama 3.2 3B or Qwen 2.5 3B can be used for rapid binary evaluation (grading), while larger models handle multi-source synthesis.
+- Cost and Rate-Limit Optimization: Caching frequent tool queries and vector similarity results avoids duplicate LLM evaluations.

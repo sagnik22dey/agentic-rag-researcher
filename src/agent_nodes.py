@@ -62,26 +62,37 @@ def grade_documents_node(state: GraphState) -> Dict[str, Any]:
     relevant_docs: List[Document] = []
     web_search_needed = False
 
-    system_prompt = (
-        "You are an objective document evaluator. "
-        "Determine if the provided context is relevant and useful for answering the user question. "
-        "Answer with ONLY a JSON object: {\"relevant\": true} or {\"relevant\": false}"
-    )
-
     if not documents:
         web_search_needed = True
     else:
-        for doc in documents:
-            try:
-                response = llm.invoke([
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=f"Question: {question}\n\nContext:\n{doc.page_content}")
-                ])
-                content = response.content.strip()
-                if "true" in content.lower():
-                    relevant_docs.append(doc)
-            except Exception:
-                relevant_docs.append(doc)
+        snippets = []
+        for idx, doc in enumerate(documents, start=1):
+            sample = doc.page_content[:350].replace("\n", " ").strip()
+            snippets.append(f"[{idx}] {sample}")
+        combined_snippets = "\n\n".join(snippets)
+
+        system_prompt = (
+            "You are an objective document evaluator. "
+            "Determine which of the candidate document snippets are relevant and useful for answering the user question. "
+            "Respond with ONLY a JSON array of relevant 1-based integer indices, e.g. [1, 2], or [] if none are relevant."
+        )
+
+        try:
+            response = llm.invoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"Question: {question}\n\nCandidate Document Snippets:\n{combined_snippets}")
+            ])
+            content = response.content.strip()
+            if "[" in content and "]" in content:
+                raw_json = content[content.find("["):content.rfind("]") + 1]
+                selected_indices = json.loads(raw_json)
+                for idx in selected_indices:
+                    if isinstance(idx, int) and 1 <= idx <= len(documents):
+                        relevant_docs.append(documents[idx - 1])
+            else:
+                relevant_docs = list(documents)
+        except Exception:
+            relevant_docs = list(documents)
 
         if not relevant_docs:
             web_search_needed = True
@@ -155,9 +166,10 @@ def generate_node(state: GraphState) -> Dict[str, Any]:
 
     system_prompt = (
         "You are an autonomous research assistant. "
-        "Answer the user question comprehensively and accurately based on the provided context. "
+        "Answer the user question concisely, directly, and accurately based on the provided context. "
         "Always cite sources when referencing specific facts using [Source X] notation. "
-        "If the context is insufficient, state clearly what is missing rather than fabricating information."
+        "Avoid conversational fluff, introductory filler, or repeating the prompt. "
+        "If the context is insufficient, state clearly what is missing."
     )
 
     try:
@@ -209,7 +221,7 @@ def grade_hallucination_node(state: GraphState) -> Dict[str, Any]:
             "steps": steps
         }
 
-    context_str = "\n\n".join(d.page_content for d in documents[:4])
+    context_str = "\n\n".join(d.page_content[:400] for d in documents[:3])
 
     system_prompt = (
         "You are an evaluator assessing if an answer is grounded in facts. "

@@ -1,6 +1,7 @@
 """Streamlit Web UI for the Autonomous Fact-Checked Research Agent."""
 
 import os
+import urllib.request
 import streamlit as st
 from pathlib import Path
 from langchain_core.documents import Document
@@ -18,10 +19,39 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-title { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.2rem; }
-    .subtitle { color: #6c757d; font-size: 1.05rem; margin-bottom: 1.5rem; }
-    .step-box { background: #f8f9fa; border-left: 4px solid #4f46e5; padding: 0.6rem 1rem; margin-bottom: 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.9rem; }
-    .badge-grounded { background-color: #dcfce7; color: #166534; padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: 600; font-size: 0.85rem; }
-    .badge-web { background-color: #e0f2fe; color: #075985; padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: 600; font-size: 0.85rem; }
+    .subtitle { color: var(--text-color, #94a3b8); opacity: 0.85; font-size: 1.05rem; margin-bottom: 1.5rem; }
+    .step-box {
+        background-color: var(--secondary-background-color, #1e293b);
+        color: var(--text-color, #f8fafc);
+        border: 1px solid rgba(128, 128, 128, 0.25);
+        border-left: 4px solid #4f46e5;
+        padding: 0.75rem 1.1rem;
+        margin-bottom: 0.6rem;
+        border-radius: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.92rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    .badge-grounded {
+        background-color: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        display: inline-block;
+    }
+    .badge-web {
+        background-color: rgba(56, 189, 248, 0.15);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.4);
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -37,9 +67,14 @@ with st.sidebar:
     os.environ["LLM_PROVIDER"] = provider
 
     if provider == "ollama":
-        st.info("Ensure Ollama is running locally (e.g. `ollama run llama3.2:3b`).")
-        model_name = st.text_input("Ollama Model", value="llama3.2:3b")
-        embed_name = st.text_input("Embedding Model", value="nomic-embed-text")
+        try:
+            with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=1) as response:
+                if response.status == 200:
+                    st.success("🟢 Ollama server is active")
+        except Exception:
+            st.error("🔴 Ollama server is offline. Please start Ollama (`ollama serve`).")
+        model_name = st.text_input("Ollama Model", value=os.getenv("OLLAMA_MODEL", "llama3.2:1b"))
+        embed_name = st.text_input("Embedding Model", value=os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text"))
         os.environ["OLLAMA_MODEL"] = model_name
         os.environ["OLLAMA_EMBED_MODEL"] = embed_name
     elif provider == "groq":
@@ -107,14 +142,17 @@ if st.button("🚀 Run Agentic Research", type="primary", use_container_width=Tr
     result_container = st.empty()
 
     final_state = {}
+    displayed_steps = set()
     with st.spinner("Agentic pipeline reasoning in progress..."):
         try:
             for step_update in stream_agentic_research(user_query):
                 for node_name, node_output in step_update.items():
                     final_state.update(node_output)
-                    with step_container:
-                        for step_msg in node_output.get("steps", []):
-                            st.markdown(f'<div class="step-box">⚡ {step_msg}</div>', unsafe_allow_html=True)
+                    for step_msg in node_output.get("steps", []):
+                        if step_msg not in displayed_steps:
+                            displayed_steps.add(step_msg)
+                            with step_container:
+                                st.markdown(f'<div class="step-box">⚡ {step_msg}</div>', unsafe_allow_html=True)
         except Exception as err:
             st.error(f"Execution Error: {str(err)}")
 

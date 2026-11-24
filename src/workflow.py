@@ -1,5 +1,6 @@
 """LangGraph compilation and execution pipeline for Agentic RAG."""
 
+from functools import lru_cache
 from typing import Dict, Any, Generator
 from langgraph.graph import StateGraph, START, END
 
@@ -33,6 +34,7 @@ def decide_after_grading(state: GraphState) -> str:
     return "generate"
 
 
+@lru_cache(maxsize=1)
 def build_agentic_rag_graph():
     """Assemble and compile the StateGraph for the research agent."""
     builder = StateGraph(GraphState)

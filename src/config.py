@@ -24,40 +24,45 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 def get_llm(temperature: float = 0.0):
     """Instantiate and return the configured Chat LLM based on environment settings."""
-    if LLM_PROVIDER == "groq":
+    provider = os.getenv("LLM_PROVIDER", LLM_PROVIDER).lower()
+    if provider == "groq":
         from langchain_groq import ChatGroq
         return ChatGroq(
-            api_key=GROQ_API_KEY,
-            model_name=GROQ_MODEL,
+            api_key=os.getenv("GROQ_API_KEY", GROQ_API_KEY),
+            model_name=os.getenv("GROQ_MODEL", GROQ_MODEL),
             temperature=temperature
         )
-    elif LLM_PROVIDER == "gemini":
+    elif provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
-            google_api_key=GEMINI_API_KEY,
-            model=GEMINI_MODEL,
+            google_api_key=os.getenv("GEMINI_API_KEY", GEMINI_API_KEY),
+            model=os.getenv("GEMINI_MODEL", GEMINI_MODEL),
             temperature=temperature
         )
     else:
         from langchain_ollama import ChatOllama
         return ChatOllama(
-            base_url=OLLAMA_BASE_URL,
-            model=OLLAMA_MODEL,
-            temperature=temperature
+            base_url=os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL),
+            model=os.getenv("OLLAMA_MODEL", OLLAMA_MODEL),
+            temperature=temperature,
+            keep_alive="1h",
+            num_ctx=4096
         )
 
 
 def get_embeddings():
     """Instantiate and return the configured embedding model."""
-    if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
+    provider = os.getenv("LLM_PROVIDER", LLM_PROVIDER).lower()
+    gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+    if provider == "gemini" and gemini_key:
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
         return GoogleGenerativeAIEmbeddings(
-            google_api_key=GEMINI_API_KEY,
+            google_api_key=gemini_key,
             model="models/text-embedding-004"
         )
     else:
         from langchain_ollama import OllamaEmbeddings
         return OllamaEmbeddings(
-            base_url=OLLAMA_BASE_URL,
-            model=OLLAMA_EMBED_MODEL
+            base_url=os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL),
+            model=os.getenv("OLLAMA_EMBED_MODEL", OLLAMA_EMBED_MODEL)
         )
